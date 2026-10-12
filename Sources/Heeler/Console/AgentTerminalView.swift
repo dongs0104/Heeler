@@ -213,6 +213,7 @@ struct AgentTerminalView: View {
     @State private var keyboardControl = TerminalKeyboardControl()
     @State private var messageJump: AgentMessageJumpWiring
     @State private var composerKeyboardPresentation: AgentComposerKeyboardPresentation = .hidden
+    @State private var scrollKeyboardRequest: AgentComposerKeyboardRequest?
     /// Keeps Composer mounted while its visible system keyboard moves to the
     /// terminal. Direct Input becomes the rendered mode only after the
     /// terminal confirms first-responder ownership.
@@ -738,6 +739,8 @@ struct AgentTerminalView: View {
             // The build before retention swaps `attach` in is a placeholder;
             // the dissolve waits for the one with the surface.
             if inheritsKeyboardHandoff { detailCrossfade?.contentDidAppear() }
+            messageJump.onTouchScrollOlder = { keyboardFollowsScroll(raise: false) }
+            messageJump.onReturnedToLive = { keyboardFollowsScroll(raise: true) }
             interactionProbe?.value?.connect(
                 selectInputMode: { mode in selectInputMode(mode) },
                 switchAgent: { id in switchToAgent(id) })
@@ -1258,7 +1261,8 @@ struct AgentTerminalView: View {
                     && directToComposerHandoffID == id
             },
             onFirstResponderRequest: composerFirstResponderRequest,
-            onKeyboardHandoffSettled: composerKeyboardHandoffSettled)
+            onKeyboardHandoffSettled: composerKeyboardHandoffSettled,
+            keyboardRequest: scrollKeyboardRequest)
     }
 
     /// Attached to the control itself: a popover on the whole detail anchors
@@ -1489,6 +1493,28 @@ struct AgentTerminalView: View {
         Task { @MainActor in
             await Task.yield()
             action()
+        }
+    }
+
+    /// See ``AgentMessageJumpWiring/onTouchScrollOlder``. Leaves the tools
+    /// dock alone, and does nothing when the keyboard is already where asked
+    /// (a drag reports every row).
+    private func keyboardFollowsScroll(raise: Bool) {
+        guard isOnStage() else { return }
+        if isDirectInput {
+            guard !usesDirectToolsKeyboard, keyboardControl.isKeyboardUp != raise else { return }
+            directKeyboardIntent.setWantsKeyboard(raise)
+            if raise {
+                keyboardControl.requestKeyboard()
+            } else {
+                keyboardControl.dismissKeyboard()
+            }
+        } else {
+            guard composerKeyboardPresentation != .tools,
+                  (composerKeyboardPresentation == .system) != raise
+            else { return }
+            scrollKeyboardRequest = AgentComposerKeyboardRequest(
+                raise: raise, serial: (scrollKeyboardRequest?.serial ?? 0) &+ 1)
         }
     }
 

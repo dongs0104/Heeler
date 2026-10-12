@@ -145,6 +145,13 @@ enum SocketConnector {
         guard operations.setNonBlocking(descriptor) else {
             throw SSHError.connectionFailed
         }
+        // Small request/response exchanges (herdr pings, keystrokes) must not
+        // wait on Nagle behind the peer's delayed ACK. Best effort: a failure
+        // only costs latency, never the connection.
+        var noDelay: Int32 = 1
+        _ = setsockopt(
+            descriptor, IPPROTO_TCP, TCP_NODELAY, &noDelay,
+            socklen_t(MemoryLayout<Int32>.size))
 
         switch operations.beginConnection(descriptor, address) {
         case .connected:

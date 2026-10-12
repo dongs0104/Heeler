@@ -252,6 +252,13 @@ final class AgentMessageJumpWiring {
     /// reset-before-start race.
     private(set) var jumpInvocationCount = 0
 
+    /// The keyboard follows reading intent: a drag into history puts it
+    /// away, and a Down press that lands back on live output brings it up.
+    /// Live is only known after a Down walk; nothing reports the remote
+    /// scroll offset, so a drag alone never raises it.
+    var onTouchScrollOlder: (() -> Void)?
+    var onReturnedToLive: (() -> Void)?
+
     private var nextGeneration: UInt64 = 0
     private var jumpEpoch: UInt64 = 0
     private var jumpTask: Task<Void, Never>?
@@ -360,6 +367,7 @@ final class AgentMessageJumpWiring {
             isLive: { self.isLive(session) })
         guard let outcome, isLive(session) else { return nil }
         reach.noteNewerJump(outcome, movedViewport: movedViewport)
+        if outcome == .reachedEnd { onReturnedToLive?() }
         return outcome
     }
 
@@ -381,6 +389,7 @@ final class AgentMessageJumpWiring {
             jumpTask?.cancel()
             controller.cancel()
         }
+        if towardOlderContent { onTouchScrollOlder?() }
         // Drags report every row; only a real change may touch observed state.
         var next = reach
         next.noteTouchScroll(towardOlderContent: towardOlderContent)

@@ -450,6 +450,21 @@ struct MessageJumpControlTests {
     }
 
     @MainActor
+    @Test func onlyADragTowardHistoryReportsLeavingLive() {
+        let wiring = AgentMessageJumpWiring()
+        var olderDrags = 0
+        wiring.onTouchScrollOlder = { olderDrags += 1 }
+        let terminal = TerminalScreenView.makeConfiguredTerminal(onScroll: { _, _ in })
+        wiring.scrollControl.terminal = terminal
+        terminal.receive(Data("\u{1B}[?1049h\u{1B}[?1000;1006h".utf8))
+
+        _ = terminal.scrollTouch(translationY: -40)
+        #expect(olderDrags == 0)
+        _ = terminal.scrollTouch(translationY: 40)
+        #expect(olderDrags > 0)
+    }
+
+    @MainActor
     @Test func resetSessionAdvancesGeneration() {
         let wiring = AgentMessageJumpWiring()
         let first = wiring.liveGeneration

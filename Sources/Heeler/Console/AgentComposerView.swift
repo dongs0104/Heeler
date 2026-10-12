@@ -1,6 +1,13 @@
 import SwiftUI
 import UIKit
 
+/// A one-off ask from the detail to focus or unfocus the Composer; the
+/// serial makes a repeat of the same ask observable.
+struct AgentComposerKeyboardRequest: Equatable {
+    var raise: Bool
+    var serial: Int
+}
+
 enum AgentComposerKeyboardPresentation: Equatable {
     case hidden
     case system
@@ -174,6 +181,7 @@ struct AgentComposerView: View {
     /// Drop is Composer-only. Defaults to Composer so existing call sites stay
     /// a drop target; Direct Input must pass `.direct` to keep this inert.
     var inputMode: AgentInputMode = .composer
+    var keyboardRequest: AgentComposerKeyboardRequest? = nil
     @State private var isInputFocused = false
     /// An explicit dismissal hides suggestions for the current trigger token;
     /// removing the token arms them again.
@@ -369,6 +377,9 @@ struct AgentComposerView: View {
             else { return }
             setKeyboardPresentation(.system)
             isInputFocused = true
+        }
+        .onChange(of: keyboardRequest) { _, request in
+            if let request { isInputFocused = request.raise }
         }
         .onChange(of: isInputFocused) { _, isFocused in
             if isFocused {
